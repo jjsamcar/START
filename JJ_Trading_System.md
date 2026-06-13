@@ -10,10 +10,11 @@
 2. [Stack Tecnológico](#stack-tecnológico)
 3. [Arquitectura de la Plataforma](#arquitectura-de-la-plataforma)
 4. [Concepto Central: Instancias (Estrategia + Activo)](#concepto-central-instancias-estrategia--activo)
-5. [Estructura de Carpetas](#estructura-de-carpetas)
-6. [Módulos Planificados](#módulos-planificados)
-7. [Estrategias](#estrategias)
-8. [Roadmap](#roadmap)
+5. [El Pool: Registro y Consolidación de Instancias](#el-pool-registro-y-consolidación-de-instancias)
+6. [Estructura de Carpetas](#estructura-de-carpetas)
+7. [Módulos Planificados](#módulos-planificados)
+8. [Estrategias](#estrategias)
+9. [Roadmap](#roadmap)
 
 ---
 
@@ -115,6 +116,66 @@ Dashboard (slider gap 0.5%–2%)  →  parámetros  →  Strategy Layer (filtra 
 
 ---
 
+## El Pool: Registro y Consolidación de Instancias
+
+El **pool** es el conjunto de instancias activas que forman el portfolio. La clave del diseño: las instancias se **declaran**, no se programan a mano. Como la lógica base es única y solo cambia la config por activo, incluir una instancia en el pool se reduce a registrarla.
+
+### Flujo para agregar una instancia al pool
+
+```
+1. Creas el archivo de config        →  strategies/configs/overnight_gap_SPY.yaml
+2. La registras en el pool           →  portfolio/pool.yaml (lista de instancias activas)
+3. El loader la carga automáticamente
+```
+
+> El código base **nunca se toca**. Solo agregas configs y las activas. Si mejoras `overnight_gap.py`, todas las instancias mejoran a la vez.
+
+### El registro: `portfolio/pool.yaml`
+
+```yaml
+# Lista de instancias activas en el portfolio
+instances:
+  - id: OG_QQQ
+    strategy: overnight_gap          # apunta a la lógica base
+    config: overnight_gap_QQQ.yaml   # apunta a sus parámetros
+    enabled: true
+    capital_pct: 40                  # % del capital total asignado
+
+  - id: OG_SPY
+    strategy: overnight_gap          # MISMO código base
+    config: overnight_gap_SPY.yaml   # OTRO activo, otra config
+    enabled: true
+    capital_pct: 35
+
+  - id: OG_IWM
+    strategy: overnight_gap
+    config: overnight_gap_IWM.yaml
+    enabled: false                   # configurada pero apagada (fuera del pool)
+```
+
+### Qué hace el loader por debajo
+
+```
+para cada instancia activa (enabled: true):
+    cargar lógica base   (overnight_gap.py)
+    + cargar su config   (overnight_gap_SPY.yaml)
+    + cargar datos       (SPY.csv)
+    → genera trades de esa instancia
+    → alimenta Riesgo y Posiciones
+
+luego, la Portfolio Layer suma TODAS las instancias activas
+    → drawdown unificado, correlación, capital total
+```
+
+### Ventajas
+
+- **Activar/desactivar** una instancia = cambiar `enabled: true/false` (sin borrar nada).
+- **Asignación de capital** centralizada en el pool (`capital_pct`).
+- **Mismo código base, distintos activos**: `OG_QQQ` y `OG_SPY` apuntan al mismo `overnight_gap.py`; solo cambian config y CSV.
+- En el **dashboard**, el pool se vuelve una tabla con checkboxes para encender/apagar instancias y ver el efecto en el drawdown unificado en tiempo real.
+
+---
+
 ## Estructura de Carpetas
 
 ```
@@ -150,6 +211,8 @@ JJ_Trading_System/
 │   └── money_management.py   # Sizing, % de capital por trade
 │
 ├── portfolio/
+│   ├── pool.yaml             # Registro de instancias activas del portfolio
+│   ├── loader.py             # Lee pool.yaml y carga cada instancia activa
 │   └── consolidator.py       # Drawdown unificado, correlación, capital total
 │
 ├── dashboard/
@@ -179,6 +242,7 @@ JJ_Trading_System/
 
 ### Futuro
 - [ ] **Sistema de instancias** — Estrategia base + config por activo (QQQ, SPY, IWM…)
+- [ ] **Pool de instancias** — `pool.yaml` + loader para registrar/activar instancias
 - [ ] **Gestión de Riesgo** — Stop loss dinámico, riesgo máximo por operación, riesgo diario (por instancia)
 - [ ] **Gestión de Posiciones** — Seguimiento de trades abiertos y cerrados, historial (por instancia)
 - [ ] **Money Management** — Tamaño de posición basado en % de capital, Kelly Criterion
