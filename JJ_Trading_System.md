@@ -188,6 +188,21 @@ luego, la Portfolio Layer suma TODAS las instancias activas
 | **Datos de activos (CSV)** | Viven en el repo (`data/raw/*.csv`) para que Streamlit Cloud los lea. |
 | **Escritura desde el dashboard** | ❌ No persiste. El dashboard solo lee, nunca guarda. |
 
+### Configuraciones: dónde viven y cómo se guardan
+
+Las configs por activo (`strategies/configs/<estrategia>_<TICKER>.yaml`) viven en **GitHub**, no en Streamlit Cloud (disco efímero, no persiste). Hay dos formas de cambiar parámetros:
+
+| Forma | Dónde | ¿Persiste? |
+|---|---|---|
+| **Mover sliders en el dashboard** | Sesión actual (memoria) | ❌ Temporal — para experimentar |
+| **Guardar el `.yaml` en GitHub** | Repo | ✅ Permanente |
+
+**Flujo de guardado (botón "Exportar configuración"):** el dashboard tiene un botón que genera el texto YAML con los valores actuales de los sliders. El usuario lo copia y lo commitea al archivo de config en GitHub. La próxima vez que la app arranca, lee esos valores.
+
+```
+mueves sliders → [Exportar configuración] → copias el YAML → commit a GitHub → queda fijo
+```
+
 ### Principio: separar "calcular" de "ver"
 
 > **El dashboard NO corre la estrategia. Solo lee y muestra.** La lógica recibe datos + parámetros, calcula trades y métricas. El dashboard consume el resultado.
@@ -301,6 +316,7 @@ JJ_Trading_System/
 - [ ] **Sistema de instancias** — Estrategia base + config por activo (QQQ, SPY, IWM…)
 - [ ] **Pool de instancias** — `pool.yaml` + loader para registrar/activar instancias
 - [ ] **Caché de cálculo** — `@st.cache_data` para recalcular al cargar sin lag (Opción A)
+- [ ] **Botón "Exportar configuración"** — genera el YAML de los sliders para commitear a GitHub
 - [ ] **Gestión de Riesgo** — Stop loss dinámico, riesgo máximo por operación, riesgo diario (por instancia)
 - [ ] **Gestión de Posiciones** — Seguimiento de trades abiertos y cerrados, historial (por instancia)
 - [ ] **Money Management** — Tamaño de posición basado en % de capital, Kelly Criterion
