@@ -23,15 +23,15 @@
 
 **JJ Trading System** es un dashboard interactivo de trading construido en Python con Streamlit. El objetivo es centralizar el análisis de estrategias, la gestión de riesgo, la gestión de posiciones y el control del capital en una sola plataforma, escalable y fácil de mantener.
 
-**Activos (universo en expansión):**
-- `QQQ` — ETF Nasdaq 100 (datos CSV disponibles)
+**Activos:**
+- `QQQ` — ETF Nasdaq 100 (datos disponibles)
 - `SPY` — ETF S&P 500 (próximamente)
 - `IWM` — ETF Russell 2000 / small caps (planificado)
-- **Large caps individuales** — múltiples acciones (futuro: AAPL, MSFT, NVDA, etc.)
+- Large caps individuales (planificado)
 
-> El módulo de datos es **agnóstico al activo**: se carga cualquier ticker sin hardcodear nada, para poder escalar a decenas de activos.
+> El módulo de datos es **agnóstico al activo**: se carga cualquier ticker por su nombre, sin hardcodear nada.
 
-**Primera estrategia implementada:**
+**Primera estrategia:**
 - Overnight Gap Trading
 
 ---
@@ -43,9 +43,9 @@
 | **Python** | Lenguaje principal | v3.10+ recomendado |
 | **Streamlit** | Dashboard interactivo | UI sin necesidad de frontend separado |
 | **Pandas** | Manipulación de datos | Lectura y procesamiento de CSV |
-| **GitHub** | Control de versiones | Repositorio: `jjsamcar/START` |
-| **Claude (AI)** | Asistente de desarrollo | Edición de código, ideas, documentación |
-| **CSV local** | Fuente de datos | Datos históricos de precios (OHLCV) |
+| **GitHub** | Control de versiones y fuente de datos | Repositorio: `jjsamcar/START` |
+| **Streamlit Cloud** | Hosting del dashboard | Lee código y datos desde el repo |
+| **CSV** | Fuente de datos | Históricos de precios (OHLCV) en `data/raw/` |
 
 ---
 
@@ -56,7 +56,7 @@ La plataforma está diseñada con un principio central: **cada módulo es indepe
 ```
 JJ Trading System
 │
-├── 📊 Data Layer          → Carga y limpieza de datos (CSV, futuros: API)
+├── 📊 Data Layer          → Carga y limpieza de datos (CSV)
 ├── 🧠 Strategy Layer      → Lógica de cada estrategia (una por módulo)
 ├── ⚙️  Config Layer        → Parámetros por instancia (estrategia + activo)
 ├── 📈 Analysis Layer      → Backtesting, métricas, visualizaciones
@@ -69,10 +69,9 @@ JJ Trading System
 ### Principios de diseño
 
 - **Modularidad**: Cada estrategia vive en su propio archivo. Agregar una nueva no afecta las demás.
-- **Lógica agnóstica a la UI**: La estrategia no sabe que existe un dashboard. El dashboard le pasa parámetros, la estrategia los usa. Así la misma estrategia corre desde un script, un notebook o el dashboard sin cambiar nada.
-- **Escalabilidad**: La fuente de datos puede migrar de CSV local a una API (Yahoo Finance, Alpha Vantage, Polygon.io) sin cambiar la lógica de las estrategias.
-- **Reproducibilidad**: Todo el código versionado en GitHub. Cualquier resultado es reproducible.
-- **Iteración rápida**: Claude asiste en el desarrollo para implementar ideas rápidamente desde la conversación.
+- **Lógica agnóstica a la UI**: La estrategia no sabe que existe un dashboard. El dashboard le pasa parámetros, la estrategia los usa.
+- **Datos agnósticos al activo**: La carga de datos funciona con cualquier ticker, sin hardcodear.
+- **Reproducibilidad**: Todo el código y los datos versionados en GitHub.
 
 ---
 
@@ -207,14 +206,14 @@ mueves sliders → [Exportar configuración] → copias el YAML → commit a Git
 
 > **El dashboard NO corre la estrategia. Solo lee y muestra.** La lógica recibe datos + parámetros, calcula trades y métricas. El dashboard consume el resultado.
 
-### Estrategia actual: Opción A — Recalcular al cargar con caché
+### Cálculo: recalcular al cargar con caché
 
-Elegida para esta fase. Los datos son **diarios** y de pocos activos, así que el volumen es trivial (~5.000 trades por instancia, <1 segundo de cálculo). No se persisten resultados en ningún lado.
+El dashboard recalcula los trades al arrancar y cachea el resultado en memoria con `@st.cache_data`. Los datos son diarios y de pocos activos, así que el cálculo es de menos de un segundo por instancia. No se persisten resultados.
 
 ```
 Streamlit Cloud arranca
    → lee CSVs desde el repo (data/raw/*.csv)
-   → loader recalcula los trades de cada instancia   ← <1 segundo
+   → loader recalcula los trades de cada instancia
    → @st.cache_data guarda el resultado en memoria
    → mientras la app esté despierta, no recalcula
 ```
@@ -225,26 +224,6 @@ def load_instance_results(instance_id):
     # lee CSV + config y calcula; el resultado queda cacheado en memoria
     return run_instance(instance_id)
 ```
-
-- ✅ Cero gestión de persistencia
-- ✅ Siempre consistente con datos y parámetros actuales
-- ⚠️ En un *cold start* (la app despierta tras dormir) recalcula — son segundos
-
-### Estrategia futura: Opción B — Precálculo con GitHub Actions
-
-Cuando el cálculo se vuelva pesado (intradía, muchos activos), se migra sin rehacer la arquitectura:
-
-```
-GitHub Action (manual o programado)
-   → corre loader → genera results/*.parquet
-   → commitea los .parquet al repo
-        ↓
-Streamlit Cloud lee results/*.parquet (ya calculado)
-```
-
-> **Clave**: como el disco de Streamlit Cloud es efímero, cualquier `.parquet` debe generarse en **GitHub Actions** (no desde la app) y commitearse al repo para que persista. Se usaría formato `.parquet` por ser columnar y comprimido (lectura en milisegundos).
-
-**Estado actual: usamos Opción A.** Opción B queda documentada como ruta de escalado.
 
 ---
 
@@ -257,11 +236,10 @@ JJ_Trading_System/
 ├── JJ_Trading_System.md      # Documento maestro (arquitectura, índice, roadmap)
 │
 ├── data/
-│   ├── raw/                  # CSV originales sin modificar
-│   │   ├── QQQ.csv
-│   │   ├── SPY.csv
-│   │   └── IWM.csv
-│   └── processed/            # Datos con indicadores calculados
+│   └── raw/                  # CSV de precios (OHLCV), una por activo
+│       ├── QQQ.csv
+│       ├── SPY.csv
+│       └── IWM.csv
 │
 ├── strategies/
 │   ├── __init__.py
@@ -312,19 +290,16 @@ JJ_Trading_System/
 - [ ] Backtesting básico con métricas clave
 - [ ] Panel de visualización por estrategia
 
-### Futuro
-- [ ] **Sistema de instancias** — Estrategia base + config por activo (QQQ, SPY, IWM…)
+### Siguientes
+- [ ] **Sistema de instancias** — Estrategia base + config por activo (QQQ, SPY, IWM)
 - [ ] **Pool de instancias** — `pool.yaml` + loader para registrar/activar instancias
-- [ ] **Caché de cálculo** — `@st.cache_data` para recalcular al cargar sin lag (Opción A)
+- [ ] **Caché de cálculo** — `@st.cache_data` para recalcular al cargar sin lag
 - [ ] **Botón "Exportar configuración"** — genera el YAML de los sliders para commitear a GitHub
-- [ ] **Gestión de Riesgo** — Stop loss dinámico, riesgo máximo por operación, riesgo diario (por instancia)
-- [ ] **Gestión de Posiciones** — Seguimiento de trades abiertos y cerrados, historial (por instancia)
-- [ ] **Money Management** — Tamaño de posición basado en % de capital, Kelly Criterion
-- [ ] **Portfolio Layer (consolidación)** — Drawdown unificado, correlación entre estrategias, capital total del pool
-- [ ] Expansión de activos — IWM y large caps individuales
-- [ ] Conexión a API de datos en tiempo real
-- [ ] Alertas automáticas de señales
-- [ ] Reporte de performance semanal/mensual
+- [ ] **Gestión de Riesgo** — Stop loss, riesgo máximo por operación (por instancia)
+- [ ] **Gestión de Posiciones** — Seguimiento de trades abiertos y cerrados (por instancia)
+- [ ] **Money Management** — Tamaño de posición basado en % de capital
+- [ ] **Portfolio Layer** — Drawdown unificado, correlación, capital total del pool
+- [ ] **Expansión de activos** — SPY, IWM y large caps
 
 ---
 
@@ -360,9 +335,8 @@ Fase 3 — Instancias y Gestión de Capital
 
 Fase 4 — Consolidación y Escala
   ⬜ Portfolio Layer: drawdown unificado y correlación
-  ⬜ Expansión de activos (IWM, large caps)
+  ⬜ Expansión de activos (SPY, IWM, large caps)
   ⬜ Segunda estrategia
-  ⬜ Datos en tiempo real
 ```
 
 ---
