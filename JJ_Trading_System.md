@@ -11,10 +11,11 @@
 3. [Arquitectura de la Plataforma](#arquitectura-de-la-plataforma)
 4. [Concepto Central: Instancias (Estrategia + Activo)](#concepto-central-instancias-estrategia--activo)
 5. [El Pool: Registro y Consolidación de Instancias](#el-pool-registro-y-consolidación-de-instancias)
-6. [Estructura de Carpetas](#estructura-de-carpetas)
-7. [Módulos Planificados](#módulos-planificados)
-8. [Estrategias](#estrategias)
-9. [Roadmap](#roadmap)
+6. [Persistencia y Rendimiento](#persistencia-y-rendimiento)
+7. [Estructura de Carpetas](#estructura-de-carpetas)
+8. [Módulos Planificados](#módulos-planificados)
+9. [Estrategias](#estrategias)
+10. [Roadmap](#roadmap)
 
 ---
 
@@ -176,6 +177,62 @@ luego, la Portfolio Layer suma TODAS las instancias activas
 
 ---
 
+## Persistencia y Rendimiento
+
+### Entorno de ejecución
+
+| Aspecto | Decisión |
+|---|---|
+| **Dónde corre** | Streamlit Community Cloud (no local) |
+| **Disco de Streamlit Cloud** | Efímero — se borra en cada reinicio/sleep. No se puede usar para persistir. |
+| **Datos de activos (CSV)** | Viven en el repo (`data/raw/*.csv`) para que Streamlit Cloud los lea. |
+| **Escritura desde el dashboard** | ❌ No persiste. El dashboard solo lee, nunca guarda. |
+
+### Principio: separar "calcular" de "ver"
+
+> **El dashboard NO corre la estrategia. Solo lee y muestra.** La lógica recibe datos + parámetros, calcula trades y métricas. El dashboard consume el resultado.
+
+### Estrategia actual: Opción A — Recalcular al cargar con caché
+
+Elegida para esta fase. Los datos son **diarios** y de pocos activos, así que el volumen es trivial (~5.000 trades por instancia, <1 segundo de cálculo). No se persisten resultados en ningún lado.
+
+```
+Streamlit Cloud arranca
+   → lee CSVs desde el repo (data/raw/*.csv)
+   → loader recalcula los trades de cada instancia   ← <1 segundo
+   → @st.cache_data guarda el resultado en memoria
+   → mientras la app esté despierta, no recalcula
+```
+
+```python
+@st.cache_data
+def load_instance_results(instance_id):
+    # lee CSV + config y calcula; el resultado queda cacheado en memoria
+    return run_instance(instance_id)
+```
+
+- ✅ Cero gestión de persistencia
+- ✅ Siempre consistente con datos y parámetros actuales
+- ⚠️ En un *cold start* (la app despierta tras dormir) recalcula — son segundos
+
+### Estrategia futura: Opción B — Precálculo con GitHub Actions
+
+Cuando el cálculo se vuelva pesado (intradía, muchos activos), se migra sin rehacer la arquitectura:
+
+```
+GitHub Action (manual o programado)
+   → corre loader → genera results/*.parquet
+   → commitea los .parquet al repo
+        ↓
+Streamlit Cloud lee results/*.parquet (ya calculado)
+```
+
+> **Clave**: como el disco de Streamlit Cloud es efímero, cualquier `.parquet` debe generarse en **GitHub Actions** (no desde la app) y commitearse al repo para que persista. Se usaría formato `.parquet` por ser columnar y comprimido (lectura en milisegundos).
+
+**Estado actual: usamos Opción A.** Opción B queda documentada como ruta de escalado.
+
+---
+
 ## Estructura de Carpetas
 
 ```
@@ -243,6 +300,7 @@ JJ_Trading_System/
 ### Futuro
 - [ ] **Sistema de instancias** — Estrategia base + config por activo (QQQ, SPY, IWM…)
 - [ ] **Pool de instancias** — `pool.yaml` + loader para registrar/activar instancias
+- [ ] **Caché de cálculo** — `@st.cache_data` para recalcular al cargar sin lag (Opción A)
 - [ ] **Gestión de Riesgo** — Stop loss dinámico, riesgo máximo por operación, riesgo diario (por instancia)
 - [ ] **Gestión de Posiciones** — Seguimiento de trades abiertos y cerrados, historial (por instancia)
 - [ ] **Money Management** — Tamaño de posición basado en % de capital, Kelly Criterion
