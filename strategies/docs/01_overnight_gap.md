@@ -68,6 +68,12 @@ Esta instancia puede incluir/excluir trades por eventos (`data/events.csv`: fed,
 
 *(Por definir: qué filtros mejoran cada activo, según comparación con/sin.)*
 
+### Costos y ejecución
+
+Comisión y slippage estilo IBKR (por acción), más los precios de entrada/salida del backtest, en la sección `execution` del `.yaml`. Define a qué precio se mide el gap (open/close/next_open). Ver "Análisis Cuantitativo" en el documento maestro.
+
+> Datos ajustados solo por splits (no dividendos): el benchmark Buy & Hold queda ligeramente subestimado.
+
 ---
 
 ## Reglas de Entrada

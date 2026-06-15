@@ -190,6 +190,46 @@ OG_IWM trades ─┘                                        ↓
                                           portfolio/ consolida todas
 ```
 
+### Métricas estándar (set ampliado)
+
+Todas las instancias se evalúan con el mismo set de métricas:
+
+| Grupo | Métricas |
+|---|---|
+| Rentabilidad | Return total, CAGR |
+| Riesgo ajustado | Sharpe, Sortino, Calmar |
+| Drawdown | Max DD, duración del Max DD, recovery factor |
+| Operativa | Win %, Profit Factor, Expectancy, # trades, racha máxima de pérdidas |
+| Eficiencia | Exposure (% de tiempo en mercado) |
+| Comparativa | vs. Buy & Hold del mismo activo |
+
+### Costos y supuestos de ejecución (por instancia)
+
+El backtester resta costos para dar resultados realistas. Se modelan al estilo Interactive Brokers (comisión por acción) y son configurables por instancia.
+
+```yaml
+# en overnight_gap_QQQ.yaml
+execution:
+  commission_per_share: 0.0035   # IBKR Pro tiered (~$0.0035/acción)
+  min_commission: 0.35           # mínimo por orden
+  slippage_pct: 0.0001           # ~0.01% en ETFs líquidos
+  entry_price: open              # open / close / next_open
+  exit_price: close              # define a qué precio entra/sale el backtest
+```
+
+### Benchmark: Buy & Hold
+
+Cada instancia muestra sus métricas junto a las de comprar y mantener el mismo activo, para saber si la estrategia aporta valor real frente a no hacer nada.
+
+> **Supuesto de datos**: los precios están ajustados **solo por splits** (export de TradingView por defecto), no por dividendos. El benchmark B&H queda ligeramente subestimado (no incluye ~0.6% de QQQ / ~1.3% de SPY anual en dividendos). Tenerlo en cuenta al comparar.
+
+### Optimización de parámetros (In-Sample)
+
+El ajuste de parámetros (ej. rango de gap) se hace sobre el período IS. Se busca **robustez**, no el punto óptimo frágil: zonas donde los valores vecinos también funcionan.
+
+- **Tab separada "Optimización"** en la página *Strategies*: corre un grid de combinaciones y muestra un **heatmap de robustez** (ej. Sharpe en función de `gap_min` × `gap_max`). Vive ahí para no saturar la vista principal.
+- **Decisión final en el tab principal**: tras analizar el heatmap, eliges la zona robusta y ajustas el slider en la vista principal.
+
 ### In-Sample / Out-of-Sample (por instancia)
 
 Para hacer cada instancia más robusta, su backtest se divide en períodos de fechas. El rango IS/OOS es **por instancia** (cada activo se afina por separado) y vive en su config `.yaml`.
@@ -292,7 +332,7 @@ El dashboard se organiza en páginas (menú lateral de Streamlit). El **análisi
 | Página | Alcance | Contenido |
 |---|---|---|
 | **Overview** | Global | Resumen general del portafolio |
-| **Strategies** | Por instancia | Selectores estrategia+activo · sliders de parámetros · backtest IS/OOS · métricas · equity curve · tabla de trades · Montecarlo · botón Exportar configuración |
+| **Strategies** | Por instancia | **Tab principal**: selectores estrategia+activo · sliders · backtest IS/OOS · métricas (vs B&H) · equity curve · tabla de trades · Montecarlo · filtros · Exportar configuración. **Tab Optimización**: grid + heatmap de robustez |
 | **Risk** | Por instancia | Stop, riesgo máximo, sizing |
 | **Positions** | Por instancia | Trades abiertos y cerrados |
 | **Portfolio** | Consolidado | Pool (on/off), drawdown unificado, **matriz de correlaciones**, capital total |
@@ -378,9 +418,10 @@ JJ_Trading_System/
 │       └── 01_overnight_gap.md
 │
 ├── analysis/
-│   ├── backtester.py         # Motor de backtest (incluye IS/OOS por instancia)
-│   ├── metrics.py            # Sharpe, drawdown, win rate, etc.
-│   └── montecarlo.py         # Simulaciones de robustez por instancia
+│   ├── backtester.py         # Motor de backtest (IS/OOS, costos, ejecución, B&H)
+│   ├── metrics.py            # Set ampliado: Sharpe, Sortino, Calmar, PF, etc.
+│   ├── montecarlo.py         # Simulaciones de robustez por instancia
+│   └── optimizer.py          # Grid de parámetros + heatmap de robustez (IS)
 │
 ├── risk/
 │   ├── risk_manager.py       # Reglas de riesgo por instancia
@@ -425,7 +466,11 @@ JJ_Trading_System/
 - [ ] **Gestión de Riesgo** — Stop loss, riesgo máximo por operación (por instancia)
 - [ ] **Gestión de Posiciones** — Seguimiento de trades abiertos y cerrados (por instancia)
 - [ ] **Money Management** — Tamaño de posición basado en % de capital
+- [ ] **Métricas (set ampliado)** — Sharpe, Sortino, Calmar, Profit Factor, Expectancy, exposure, etc.
+- [ ] **Costos y ejecución** — Comisión/slippage estilo IBKR + precios de entrada/salida, por instancia
+- [ ] **Benchmark Buy & Hold** — Comparación de cada instancia vs. mantener el activo
 - [ ] **Backtest IS/OOS** — Rangos de fecha por instancia, con tramos activables/excluibles
+- [ ] **Optimización** — Grid + heatmap de robustez en tab separada (IS)
 - [ ] **Montecarlo** — Simulaciones de robustez por instancia
 - [ ] **Filtros** — Eventos (`events.csv`), día de la semana y horario, por instancia con comparación con/sin
 - [ ] **Portfolio Layer** — Drawdown unificado, correlación, capital total del pool
