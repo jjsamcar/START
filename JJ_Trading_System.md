@@ -236,18 +236,23 @@ Para hacer cada instancia más robusta, su backtest se divide en períodos de fe
 
 - **In-Sample (IS)**: período donde se ajustan/optimizan los parámetros.
 - **Out-of-Sample (OOS)**: período reservado para validar que la estrategia no está sobreajustada.
-- Se pueden **activar/desactivar rangos de fechas** del muestreo, para incluir o excluir tramos del análisis.
+- **IS y OOS son listas de bloques**: cada uno puede tener varios rangos de fecha, no uno solo. Permite cubrir distintos regímenes de mercado (alcista, bajista, crisis) e intercalar IS/OOS en el tiempo en vez de partir la historia en dos mitades.
+- Cada bloque se puede **activar/desactivar** (`enabled`), y hay exclusiones globales que se ignoran en cualquier período.
 
 ```yaml
 # en overnight_gap_QQQ.yaml
 periods:
-  in_sample:  { start: 2015-01-01, end: 2021-12-31, enabled: true }
-  out_sample: { start: 2022-01-01, end: 2025-12-31, enabled: true }
-  exclude:                                  # tramos a ignorar del muestreo
+  in_sample:                                # lista de bloques
+    - { start: 2015-01-01, end: 2018-12-31, enabled: true }
+    - { start: 2020-06-01, end: 2022-12-31, enabled: true }
+  out_sample:                               # lista de bloques
+    - { start: 2019-01-01, end: 2020-05-31, enabled: true }
+    - { start: 2023-01-01, end: 2025-12-31, enabled: true }
+  exclude:                                  # tramos a ignorar de cualquier período
     - { start: 2020-02-15, end: 2020-04-15, enabled: true }   # ej. crash COVID
 ```
 
-En el dashboard, esto se controla con sliders/rangos de fecha y los resultados se ven por separado (Completo / Solo IS / Solo OOS).
+El backtester une los bloques activos de cada conjunto y calcula las métricas sobre ellos. En el dashboard, esto se controla con rangos de fecha y los resultados se ven por separado (Completo / Solo IS / Solo OOS).
 
 ### Análisis de Montecarlo (por instancia)
 
@@ -469,7 +474,7 @@ JJ_Trading_System/
 - [ ] **Métricas (set ampliado)** — Sharpe, Sortino, Calmar, Profit Factor, Expectancy, exposure, etc.
 - [ ] **Costos y ejecución** — Comisión/slippage estilo IBKR + precios de entrada/salida, por instancia
 - [ ] **Benchmark Buy & Hold** — Comparación de cada instancia vs. mantener el activo
-- [ ] **Backtest IS/OOS** — Rangos de fecha por instancia, con tramos activables/excluibles
+- [ ] **Backtest IS/OOS** — Múltiples bloques de fecha por conjunto, activables/excluibles, por instancia
 - [ ] **Optimización** — Grid + heatmap de robustez en tab separada (IS)
 - [ ] **Montecarlo** — Simulaciones de robustez por instancia
 - [ ] **Filtros** — Eventos (`events.csv`), día de la semana y horario, por instancia con comparación con/sin

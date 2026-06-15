@@ -54,7 +54,7 @@ Cada activo se opera como una instancia independiente con sus propios parámetro
 
 ### Períodos de muestreo (IS/OOS)
 
-Cada instancia define sus propios rangos In-Sample / Out-of-Sample en su config, con tramos que se pueden activar o excluir del muestreo. Ver "Análisis Cuantitativo" en el documento maestro.
+Cada instancia define sus propios rangos In-Sample / Out-of-Sample en su config. IS y OOS son **listas de bloques** (varios rangos por conjunto) que se pueden activar o excluir del muestreo. Ver "Análisis Cuantitativo" en el documento maestro.
 
 | Período | Uso |
 |---|---|
