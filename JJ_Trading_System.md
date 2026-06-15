@@ -12,12 +12,13 @@
 4. [Concepto Central: Instancias (Estrategia + Activo)](#concepto-central-instancias-estrategia--activo)
 5. [El Pool: Registro y Consolidación de Instancias](#el-pool-registro-y-consolidación-de-instancias)
 6. [Análisis Cuantitativo](#análisis-cuantitativo)
-7. [Organización del Dashboard](#organización-del-dashboard)
-8. [Persistencia y Rendimiento](#persistencia-y-rendimiento)
-9. [Estructura de Carpetas](#estructura-de-carpetas)
-10. [Módulos Planificados](#módulos-planificados)
-11. [Estrategias](#estrategias)
-12. [Roadmap](#roadmap)
+7. [Filtros](#filtros)
+8. [Organización del Dashboard](#organización-del-dashboard)
+9. [Persistencia y Rendimiento](#persistencia-y-rendimiento)
+10. [Estructura de Carpetas](#estructura-de-carpetas)
+11. [Módulos Planificados](#módulos-planificados)
+12. [Estrategias](#estrategias)
+13. [Roadmap](#roadmap)
 
 ---
 
@@ -218,6 +219,72 @@ Comparan el comportamiento entre instancias, así que viven en `portfolio/consol
 
 ---
 
+## Filtros
+
+Los filtros permiten incluir o excluir trades según condiciones (eventos, día de la semana, horario). **La decisión de qué filtrar es por instancia** (vive en su config); los **datos compartidos** (fechas de eventos) viven en un archivo único.
+
+| Cosa | Alcance | Dónde vive |
+|---|---|---|
+| Datos (fechas de eventos) | Compartido | `data/events.csv` (uno solo) |
+| Decisión (qué filtros aplicar) | Por instancia | sección `filters` del `.yaml` |
+
+### Formato estándar de eventos: `data/events.csv`
+
+Un solo archivo con columnas fijas para todos los tipos de evento.
+
+```csv
+date,type,asset,name
+2024-01-31,fed,ALL,FOMC Decision
+2024-02-13,macro,ALL,CPI
+2024-03-01,macro,ALL,NFP
+2024-01-25,earnings,QQQ,Big tech earnings week
+2024-02-19,holiday,ALL,Presidents Day
+```
+
+| Columna | Qué es | Valores |
+|---|---|---|
+| `date` | Fecha del evento | `YYYY-MM-DD` (ISO) |
+| `type` | Tipo de evento | `fed`, `macro`, `earnings`, `holiday` |
+| `asset` | A qué activo aplica | un ticker (`QQQ`) o `ALL` (mercado) |
+| `name` | Etiqueta legible | texto libre, opcional |
+
+**Reglas de consistencia:** fechas siempre `YYYY-MM-DD`; `type` en minúsculas de la lista permitida; eventos de mercado usan `asset=ALL`; sin filas duplicadas (`date`+`type`+`asset`).
+
+### Filtros por instancia (familia `filters` en config)
+
+Todos los filtros se agrupan bajo `filters` en el `.yaml` de la instancia. Agregar uno nuevo = una entrada más, sin rediseñar.
+
+```yaml
+# en overnight_gap_QQQ.yaml
+filters:
+  events:                          # usa data/events.csv
+    exclude_fed: true
+    exclude_earnings: true
+    exclude_macro: false
+    offset_days: 0                 # 0 = solo el día; ±1 = día previo/siguiente
+  weekday:
+    exclude: [monday]              # no necesita datos
+  time:
+    session: regular               # regular / extended (relevante en intradía)
+```
+
+### En el dashboard
+
+En la página *Strategies*, cada filtro es un check o selector, y se muestra la **comparación con/sin** para decidir si el filtro mejora la estrategia.
+
+```
+FILTROS DE EVENTOS (OG_QQQ)
+  ☑ Excluir días Fed        ☑ Excluir earnings     ☐ Excluir macro
+
+           Todos   Sin Fed   Sin earnings
+  Sharpe   1.45     1.61       1.52
+  MaxDD   -12%     -9.5%      -10.2%
+```
+
+El motor `analysis/` lee la sección `filters`, filtra los trades antes de calcular métricas, y aplica los filtros de forma uniforme a cualquier instancia.
+
+---
+
 ## Organización del Dashboard
 
 El dashboard se organiza en páginas (menú lateral de Streamlit). El **análisis por instancia** vive en una sola página con selectores; el **consolidado** en otra.
@@ -294,10 +361,11 @@ JJ_Trading_System/
 ├── JJ_Trading_System.md      # Documento maestro (arquitectura, índice, roadmap)
 │
 ├── data/
-│   └── raw/                  # CSV de precios (OHLCV), una por activo
-│       ├── QQQ.csv
-│       ├── SPY.csv
-│       └── IWM.csv
+│   ├── raw/                  # CSV de precios (OHLCV), una por activo
+│   │   ├── QQQ.csv
+│   │   ├── SPY.csv
+│   │   └── IWM.csv
+│   └── events.csv           # Fechas de eventos (fed, macro, earnings, holiday)
 │
 ├── strategies/
 │   ├── __init__.py
@@ -359,6 +427,7 @@ JJ_Trading_System/
 - [ ] **Money Management** — Tamaño de posición basado en % de capital
 - [ ] **Backtest IS/OOS** — Rangos de fecha por instancia, con tramos activables/excluibles
 - [ ] **Montecarlo** — Simulaciones de robustez por instancia
+- [ ] **Filtros** — Eventos (`events.csv`), día de la semana y horario, por instancia con comparación con/sin
 - [ ] **Portfolio Layer** — Drawdown unificado, correlación, capital total del pool
 - [ ] **Expansión de activos** — SPY, IWM y large caps
 

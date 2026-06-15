@@ -62,6 +62,12 @@ Cada instancia define sus propios rangos In-Sample / Out-of-Sample en su config,
 | Out-of-Sample | Validación (no sobreajuste) |
 | Exclusiones | Tramos a ignorar (ej. eventos atípicos) |
 
+### Filtros
+
+Esta instancia puede incluir/excluir trades por eventos (`data/events.csv`: fed, macro, earnings, holiday), día de la semana y horario. Se configuran en la sección `filters` del `.yaml`. Ver "Filtros" en el documento maestro.
+
+*(Por definir: qué filtros mejoran cada activo, según comparación con/sin.)*
+
 ---
 
 ## Reglas de Entrada
