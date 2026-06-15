@@ -11,11 +11,13 @@
 3. [Arquitectura de la Plataforma](#arquitectura-de-la-plataforma)
 4. [Concepto Central: Instancias (Estrategia + Activo)](#concepto-central-instancias-estrategia--activo)
 5. [El Pool: Registro y Consolidación de Instancias](#el-pool-registro-y-consolidación-de-instancias)
-6. [Persistencia y Rendimiento](#persistencia-y-rendimiento)
-7. [Estructura de Carpetas](#estructura-de-carpetas)
-8. [Módulos Planificados](#módulos-planificados)
-9. [Estrategias](#estrategias)
-10. [Roadmap](#roadmap)
+6. [Análisis Cuantitativo](#análisis-cuantitativo)
+7. [Organización del Dashboard](#organización-del-dashboard)
+8. [Persistencia y Rendimiento](#persistencia-y-rendimiento)
+9. [Estructura de Carpetas](#estructura-de-carpetas)
+10. [Módulos Planificados](#módulos-planificados)
+11. [Estrategias](#estrategias)
+12. [Roadmap](#roadmap)
 
 ---
 
@@ -59,7 +61,7 @@ JJ Trading System
 ├── 📊 Data Layer          → Carga y limpieza de datos (CSV)
 ├── 🧠 Strategy Layer      → Lógica de cada estrategia (una por módulo)
 ├── ⚙️  Config Layer        → Parámetros por instancia (estrategia + activo)
-├── 📈 Analysis Layer      → Backtesting, métricas, visualizaciones
+├── 📈 Analysis Layer      → Motor genérico: backtest, métricas, Montecarlo (se aplica por instancia)
 ├── 💰 Risk & Capital      → Gestión de riesgo, sizing, money management
 ├── 📋 Position Manager    → Seguimiento de posiciones abiertas/cerradas
 ├── 🔗 Portfolio Layer     → Consolidación: drawdown unificado, correlación, capital total
@@ -176,6 +178,62 @@ luego, la Portfolio Layer suma TODAS las instancias activas
 
 ---
 
+## Análisis Cuantitativo
+
+El módulo `analysis/` es un **motor genérico**: el código de backtest y métricas se escribe una sola vez y se **aplica por instancia**. El resultado es por estrategia+activo; el código es compartido (no se duplica por cada una).
+
+```
+OG_QQQ trades ─┐
+OG_SPY trades ─┼─→  analysis/ (motor único)  ─→  métricas por instancia
+OG_IWM trades ─┘                                        ↓
+                                          portfolio/ consolida todas
+```
+
+### In-Sample / Out-of-Sample (por instancia)
+
+Para hacer cada instancia más robusta, su backtest se divide en períodos de fechas. El rango IS/OOS es **por instancia** (cada activo se afina por separado) y vive en su config `.yaml`.
+
+- **In-Sample (IS)**: período donde se ajustan/optimizan los parámetros.
+- **Out-of-Sample (OOS)**: período reservado para validar que la estrategia no está sobreajustada.
+- Se pueden **activar/desactivar rangos de fechas** del muestreo, para incluir o excluir tramos del análisis.
+
+```yaml
+# en overnight_gap_QQQ.yaml
+periods:
+  in_sample:  { start: 2015-01-01, end: 2021-12-31, enabled: true }
+  out_sample: { start: 2022-01-01, end: 2025-12-31, enabled: true }
+  exclude:                                  # tramos a ignorar del muestreo
+    - { start: 2020-02-15, end: 2020-04-15, enabled: true }   # ej. crash COVID
+```
+
+En el dashboard, esto se controla con sliders/rangos de fecha y los resultados se ven por separado (Completo / Solo IS / Solo OOS).
+
+### Análisis de Montecarlo (por instancia)
+
+Vive en `analysis/montecarlo.py`. Toma los trades ya calculados de una instancia y corre N simulaciones reordenando/remuestreando para estimar la robustez (distribución de returns, peor drawdown esperado, probabilidad de ruina). Se aplica por instancia, igual que el backtester.
+
+### Correlaciones (a nivel de portfolio)
+
+Comparan el comportamiento entre instancias, así que viven en `portfolio/consolidator.py` (no en una instancia individual). Resultado: matriz de correlación para saber qué está y qué no está correlacionado dentro del pool.
+
+---
+
+## Organización del Dashboard
+
+El dashboard se organiza en páginas (menú lateral de Streamlit). El **análisis por instancia** vive en una sola página con selectores; el **consolidado** en otra.
+
+| Página | Alcance | Contenido |
+|---|---|---|
+| **Overview** | Global | Resumen general del portafolio |
+| **Strategies** | Por instancia | Selectores estrategia+activo · sliders de parámetros · backtest IS/OOS · métricas · equity curve · tabla de trades · Montecarlo · botón Exportar configuración |
+| **Risk** | Por instancia | Stop, riesgo máximo, sizing |
+| **Positions** | Por instancia | Trades abiertos y cerrados |
+| **Portfolio** | Consolidado | Pool (on/off), drawdown unificado, **matriz de correlaciones**, capital total |
+
+> Una sola página *Strategies* sirve para analizar **cualquier** instancia: cambias los selectores de arriba y el motor `analysis/` recalcula los resultados de la instancia elegida. No hace falta una página por estrategia+activo.
+
+---
+
 ## Persistencia y Rendimiento
 
 ### Entorno de ejecución
@@ -252,8 +310,9 @@ JJ_Trading_System/
 │       └── 01_overnight_gap.md
 │
 ├── analysis/
-│   ├── backtester.py         # Motor de backtesting
-│   └── metrics.py            # Sharpe, drawdown, win rate, etc.
+│   ├── backtester.py         # Motor de backtest (incluye IS/OOS por instancia)
+│   ├── metrics.py            # Sharpe, drawdown, win rate, etc.
+│   └── montecarlo.py         # Simulaciones de robustez por instancia
 │
 ├── risk/
 │   ├── risk_manager.py       # Reglas de riesgo por instancia
@@ -298,6 +357,8 @@ JJ_Trading_System/
 - [ ] **Gestión de Riesgo** — Stop loss, riesgo máximo por operación (por instancia)
 - [ ] **Gestión de Posiciones** — Seguimiento de trades abiertos y cerrados (por instancia)
 - [ ] **Money Management** — Tamaño de posición basado en % de capital
+- [ ] **Backtest IS/OOS** — Rangos de fecha por instancia, con tramos activables/excluibles
+- [ ] **Montecarlo** — Simulaciones de robustez por instancia
 - [ ] **Portfolio Layer** — Drawdown unificado, correlación, capital total del pool
 - [ ] **Expansión de activos** — SPY, IWM y large caps
 

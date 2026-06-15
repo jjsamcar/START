@@ -52,6 +52,16 @@ Cada activo se opera como una instancia independiente con sus propios parámetro
 
 *(Más parámetros por definir: dirección del gap, día de la semana, etc.)*
 
+### Períodos de muestreo (IS/OOS)
+
+Cada instancia define sus propios rangos In-Sample / Out-of-Sample en su config, con tramos que se pueden activar o excluir del muestreo. Ver "Análisis Cuantitativo" en el documento maestro.
+
+| Período | Uso |
+|---|---|
+| In-Sample | Ajuste/optimización de parámetros |
+| Out-of-Sample | Validación (no sobreajuste) |
+| Exclusiones | Tramos a ignorar (ej. eventos atípicos) |
+
 ---
 
 ## Reglas de Entrada
