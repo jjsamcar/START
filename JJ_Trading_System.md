@@ -137,10 +137,14 @@ El **pool** es el conjunto de instancias activas que forman el portfolio. La cla
 
 ```yaml
 # Lista de instancias activas en el portfolio
+date_range:                          # rango de análisis del pool (independiente de IS/OOS)
+  start: 2020-01-01
+  end: 2025-12-31
+
 instances:
   - id: OG_QQQ
     strategy: overnight_gap          # apunta a la lógica base
-    config: overnight_gap_QQQ.yaml   # apunta a sus parámetros
+    config: overnight_gap_QQQ.yaml   # apunta a sus parámetros (ya optimizados)
     enabled: true
     capital_pct: 40                  # % del capital total asignado
 
@@ -155,6 +159,8 @@ instances:
     config: overnight_gap_IWM.yaml
     enabled: false                   # configurada pero apagada (fuera del pool)
 ```
+
+> **IS/OOS no aplica en el pool.** Los períodos In-Sample/Out-of-Sample son una herramienta de **desarrollo y validación** (página *Strategies*). Cuando una instancia entra al pool, sus parámetros ya están fijos y validados; el pool corre sobre **su propio `date_range`**, no sobre los bloques IS/OOS de cada instancia.
 
 ### Qué hace el loader por debajo
 
@@ -253,6 +259,8 @@ periods:
 ```
 
 El backtester une los bloques activos de cada conjunto y calcula las métricas sobre ellos. En el dashboard, esto se controla con rangos de fecha y los resultados se ven por separado (Completo / Solo IS / Solo OOS).
+
+> **Alcance:** IS/OOS es solo para desarrollo y validación de parámetros en la página *Strategies*. No se traslada al pool: una vez fijados los parámetros, el pool corre sobre su propio `date_range` (ver sección del Pool).
 
 ### Análisis de Montecarlo (por instancia)
 
